@@ -51,6 +51,8 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
     FILES
     QLearningReward.msg
+    QMatrix.msg
+    QMatrixRow.msg
     RobotMoveDBToBlock.msg
 )
 

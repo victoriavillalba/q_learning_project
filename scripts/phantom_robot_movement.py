@@ -40,8 +40,7 @@ class PhantomRobotMovement(object):
         self.model_states_pub = rospy.Publisher("/gazebo/set_model_state", ModelState, queue_size=10)
 
         # information about the robot action to take
-        self.robot_action_in_queue = False
-        self.robot_action_to_take = None
+        self.robot_action_queue = []
 
         # numbered block model names
         self.numbered_block_model_names = {
@@ -75,33 +74,36 @@ class PhantomRobotMovement(object):
 
         time.sleep(0.5)
 
-        pt = Point(
-            x=(self.current_numbered_block_locations[self.robot_action_to_take.goal_block_num].x + 0.6),
-            y=self.current_numbered_block_locations[self.robot_action_to_take.goal_block_num].y,
-            z=self.current_numbered_block_locations[self.robot_action_to_take.goal_block_num].z
-        )
+        if (len(self.robot_action_queue) > 0):
 
-        print(self.robot_action_to_take)
+            robot_action_to_take = self.robot_action_queue[0]
 
-        p = Pose(position=pt,
-                 orientation=self.quat_orientation_of_dbs)
-        t = Twist(linear=Vector3(0,0,0), angular=Vector3(0,0,0))
-        m_name = self.db_model_names[self.robot_action_to_take.robot_db]
+            pt = Point(
+                x=(self.current_numbered_block_locations[robot_action_to_take.goal_block_num].x + 0.6),
+                y=self.current_numbered_block_locations[robot_action_to_take.goal_block_num].y,
+                z=self.current_numbered_block_locations[robot_action_to_take.goal_block_num].z
+            )
 
-        robot_db_model_state = ModelState(model_name=m_name, pose=p, twist=t)
+            print(robot_action_to_take)
 
-        self.model_states_pub.publish(robot_db_model_state)
+            p = Pose(position=pt,
+                     orientation=self.quat_orientation_of_dbs)
+            t = Twist(linear=Vector3(0,0,0), angular=Vector3(0,0,0))
+            m_name = self.db_model_names[robot_action_to_take.robot_db]
 
-        # reset the flag and the action in the queue
-        self.robot_action_in_queue = False
-        self.robot_action_to_take = None
+            robot_db_model_state = ModelState(model_name=m_name, pose=p, twist=t)
+
+            self.model_states_pub.publish(robot_db_model_state)
+
+            # reset the flag and the action in the queue
+            self.robot_action_queue.pop(0)
 
 
     def model_states_received(self, data):
 
         # if we have a robot action in our queue, get the locations of the 
         # dbs and numbered blocks
-        if (self.robot_action_in_queue):
+        if (len(self.robot_action_queue) > 0):
 
             # get the numbered block locations
             for block_id in self.numbered_block_model_names:
@@ -118,8 +120,8 @@ class PhantomRobotMovement(object):
 
 
     def prepare_to_take_robot_action(self, data):
-        self.robot_action_in_queue = True
-        self.robot_action_to_take = RobotAction(data.robot_db, data.block_id)
+        # print(data)
+        self.robot_action_queue.append(RobotAction(data.robot_db, data.block_id))
 
 
     def run(self):
