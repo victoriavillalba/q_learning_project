@@ -15,11 +15,12 @@ class QLearning(object):
         rospy.init_node('q_learning')
         
         # Subscribe to the reward topic 
-        rospy.Subscriber("q_learning/QLearningReward", QLearningReward, self.reward_callback)        
+        rospy.Subscriber("q_learning/reward", QLearningReward, self.reward_callback)        
         
         # Set publishers for later use 
-        self.q_matrix_pub = rospy.Publisher("/q_learning/q_matrix", QMatrix, queue_size=10)
-        self.robot_action_pub = rospy.Publisher("/q_learning/RobotMoveDBToBlock", RobotMoveDBToBlock, queue_size=10)
+        self.q_matrix_pub = rospy.Publisher("/q_learning/q_matrix", QMatrix, queue_size=1)
+        self.robot_action_pub = rospy.Publisher("/q_learning/robot_action", RobotMoveDBToBlock, queue_size=1)
+        self.robot_action_pub.publish(RobotMoveDBToBlock())
         
         # Initialize Q Matrix
         self.Q = QMatrix()
@@ -33,6 +34,7 @@ class QLearning(object):
         
         self.sample_action(init=True)
     
+
     def get_state_from_row(self, row: int):
         """Given a row, translates it to state information
 
@@ -99,20 +101,20 @@ class QLearning(object):
             break
         return 
 
+
     def sample_action(self, init=False):
-        print("sampling")
         # selecting a_t at random 
         current_state = None
         if (init):
             current_state = 0
         possible_actions = np.array(self.A[current_state])
-        print(possible_actions)
-        possible_actions = possible_actions[possible_actions != -1]
-        print(possible_actions)
+        possible_actions = possible_actions[possible_actions != -1] 
+        
         action = self.get_action_from_col(np.random.choice(possible_actions))
+
         robot_action = RobotMoveDBToBlock()
-        robot_action.robot_db = str(action[0]) # "1" = RED, "2" = GREEN, "3" = BLUE
-        robot_action.block_id = action[1]
+        robot_action.robot_db = convert_color_to_str(action[0]) # "1" = RED, "2" = GREEN, "3" = BLUE
+        robot_action.block_id = action[1] # 1, 2, 3
         print("publishing", robot_action)
         self.robot_action_pub.publish(robot_action)
             
@@ -120,6 +122,7 @@ class QLearning(object):
     def reward_callback(self, data: QLearningReward):
         return
         
+
     def run(self):
         rospy.spin()
         
@@ -128,11 +131,11 @@ class QLearning(object):
 Helper functions 
 """
 def count_moves_from_states(state1, state2):
-    """Count the number of moves given 2 state stuples 
+    """Count the number of moves given 2 state tuples 
 
     Args:
         state1 (tuple): start state 
-        state2 (stuple): next state
+        state2 (tuple): next state
 
     Returns:
         (int, array): (number of moves needed to reach next state, list of moves made to transition to next state given as (dumbbell, location))
@@ -144,6 +147,17 @@ def count_moves_from_states(state1, state2):
             num_moves += 1
             moves.append((i, state2[i]))
     return (num_moves, moves)
+
+def convert_color_to_str(color): 
+    if color == RED:
+        return "red"
+    elif color == GREEN: 
+        return "green"
+    elif color == BLUE:
+        return "blue"
+    else:
+        raise TypeError("color is not one of 1, 2, or 3")
+
 
 if __name__ == "__main__":
     node = QLearning()
