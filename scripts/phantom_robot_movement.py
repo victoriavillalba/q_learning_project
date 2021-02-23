@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import rospy
+import rospy, numpy
 
 from gazebo_msgs.msg import ModelState, ModelStates
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3
@@ -17,10 +17,116 @@ class RobotAction(object):
         self.robot_db = robot_dumbbell
         self.goal_block_num = goal_block_num
 
+        # set up ROS / cv bridge
+        self.bridge = cv_bridge.CvBridge()
+
+        # ROS subscribe to the topic publishing actions for the robot to take
+        rospy.Subscriber("/q_learning/robot_action", RobotMoveDBToBlock, self.do_action)
+
+        # ROS subscribe to robot's RGB camera data stream
+        self.image_sub = rospy.Subscriber('camera/rgb/image_raw', Image, self.image_callback)
+
+        self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
+
+        self.twist = Twist()
+
+        # initialize this node
+        rospy.init_node('turtlebot3_dance')
+
+        # the interface to the group of joints making up the turtlebot3
+        # openmanipulator arm
+        self.move_group_arm = moveit_commander.MoveGroupCommander("arm")
+
+        # the interface to the group of joints making up the turtlebot3
+        # openmanipulator gripper
+        self.move_group_gripper = moveit_commander.MoveGroupCommander("gripper")
+
+
     def __str__(self):
         output_str = ("Robot action: move " + self.robot_db.upper() + 
                       " to block " + str(self.goal_block_num))
         return output_str
+
+    
+    def do_action(self):
+        # get moving info
+        robot_action = RobotMoveDBToBlock()
+        #robot_action.robot_db = str(action[0]) # "red" = RED, "green" = GREEN, "blue" = BLUE
+        #robot_action.block_id = action[1]
+
+        # assign dumbbell action to robot
+        self.robot_db = robot_action.robot_db
+        self.goal_block_num = rbot_action.block_id
+
+
+    def pick_up(self):
+        continue
+
+
+    def put_down(self):
+        continue
+
+
+    def image_callback(self,msg):
+        # converts the incoming ROS message to cv2 format and HSV (hue, saturation, value)
+        image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        # define the upper and lower bounds depending on the color of the dumbbell from self.robot_db
+        lower_color = numpy.array([])
+        upper_color = numpy.array([])
+
+        if self.robot_db == "red":
+            lower_color = numpy.array([ 200, 0, 0])
+            upper_color = numpy.array([255, 50, 50])
+        elif self.robot_db == "green":
+            lower_color = numpy.array([ 0, 200, 0])
+            upper_color = numpy.array([50, 255, 50])
+        else:
+            lower_color = numpy.array([ 0, 0, 200])
+            upper_color = numpy.array([50, 50, 255])
+        mask = cv2.inRange(hsv, lower_color, upper_color)
+
+        # we now erase all pixels that aren't the designated color
+        h, w, d = image.shape
+        search_top = int(3*h/4)
+        search_bot = int(3*h/4 + 20)
+        mask[0:search_top, 0:w] = 0
+        mask[search_bot:h, 0:w] = 0
+
+        # using moments() function, determine the center of the pixels
+        M = cv2.moments(mask)
+        # if there are any pixels found
+        if M['m00'] > 0:
+            if data.ranges[0] <= 0.1:
+                # stop the robot if it's close enough to the dumbbell
+                self.twist.linear.x = 0
+                self.twist.angular.z = 0
+                self.cmd_vel_pub.publish(self.twist)
+            else:
+                # determine the center of the pixels in the image
+                cx = int(M['m10']/M['m00'])
+                cy = int(M['m01']/M['m00'])
+
+                # visualize a yellow circle in our debugging window to indicate
+                # the center point of the yellow pixels
+                cv2.circle(image, (cx, cy), 20, (255,255,0), -1)
+
+                # proportional control to have the robot follow the pixels
+                err = w/2 - cx
+                k_p = 1.0 / 100.0
+                self.twist.linear.x = 0.2
+                self.twist.angular.z = k_p * err
+                self.cmd_vel_pub.publish(self.twist)
+        else:
+            self.twist.angular.z = 0.2
+            self.cmd_vel_pub.publish(self.twist)
+
+        pick__up()
+
+        # find blocks and go towards them
+
+        put_down()
 
 
 class PhantomRobotMovement(object):
@@ -49,8 +155,7 @@ class PhantomRobotMovement(object):
             3: "number3"
         }
 
-        # numbered block locations + dimensions
-        self.current_numbered_block_locations = {}
+
         self.numbered_block_side_length = 0.8
 
         # db model names
