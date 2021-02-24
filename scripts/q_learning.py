@@ -38,7 +38,19 @@ class QLearning(object):
         
         # Initialize state to s0
         self.state = 0 
+        
+        # Running window to keep track of recent q_matrix updates 
         self.running_update_window = []
+        
+        # The time the last reward was received. Used to catch on bogus reward values from the world resetting
+        self.time_last_reward = 0
+        
+        # Time delay between receiving a reward and acting on it. Should have a non-zero value for performance issues
+        self.delay = 0.5
+        
+        # Used to keep track of the last n q_matrix update values
+        # The algorithm will determine if it's converged if the last n values did not produce a new update 
+        self.running_update_window_len = 200 
         
         # No action was taken yet 
         self.action_choice = -1
@@ -126,6 +138,7 @@ class QLearning(object):
         print("Possible actions", possible_actions)
         if (len(possible_actions) == 0):
             print("no possible action for this state")
+            self.action_choice = -2
             return
         
         choice = np.random.choice(possible_actions)
@@ -139,41 +152,77 @@ class QLearning(object):
         
 
     def reward_callback(self, data: QLearningReward):
-        print("action", self.action_choice)
-        print("Reward received", data.reward)
-        rospy.sleep(0.5)
+        print("action", self.action_choice, self.get_action_from_col(self.action_choice))
+        print("Reward received", data.reward, data.header.stamp.to_time())
+        # Catching bogus reward where reset_world.py sends us a reward when the world resets (this should not always happen but we need to catch it for our code's logic)
+        if (data.header.stamp.to_time() - self.time_last_reward < (self.delay / 2)):
+            print("Received bogus reward for reset state")
+            print("\n")
+            return
+        self.time_last_reward = data.header.stamp.to_time()
+        
+        # Sleep to give Gazebo time to recuperate
+        rospy.sleep(self.delay)
+        
         action_taken = self.action_choice
+        # This if statement is never called, but placed here for safe measure
+        if (action_taken == -2): # No valid action, i.e. all 3 dumbbells already in front of 3 distinct blocks
+            print("Did not take an action, should not've received a reward")
+            return
+        
         current_state = self.state
         next_state = np.where(np.array(self.A[current_state]) == action_taken)[0][0]
-        print("state", current_state, "next state", next_state)
+        print("state", current_state, "next state", next_state, self.get_state_from_row(next_state))
         alpha = 1
-        gamma = 0.5
+        gamma = 0.2
+        print("best next action", max(self.Q.q_matrix[next_state]), np.where(self.Q.q_matrix[next_state] == max(self.Q.q_matrix[next_state]))[0])
         
+        # Applying basic q-learning update formula
         Q_st_at = self.Q.q_matrix[current_state][action_taken]
         updated_q_matrix_val = Q_st_at + alpha * (data.reward + gamma * max(self.Q.q_matrix[next_state]) - Q_st_at)
         self.Q.q_matrix[current_state][action_taken] = updated_q_matrix_val
-        print("new q_matrix_val ", Q_st_at, "->", updated_q_matrix_val)
+        print("new q_matrix_val ", Q_st_at, "->", int(updated_q_matrix_val))
         
-        # Update the running window 
-        if (len(self.running_update_window) > 64):
+        # Update the running window tracker
+        if (len(self.running_update_window) >= self.running_update_window_len):
             self.running_update_window.pop(0)
         self.running_update_window.append(str(Q_st_at) + "->" + str(updated_q_matrix_val))
-        
         print(self.running_update_window)        
+        
+        # Publishing new q matrix 
         self.q_matrix_pub.publish(serialize_Q(self.Q))
 
         # Reset the state since all 3 dumbbells have exactly 1 block in front of them        
         next_state_pos = self.get_state_from_row(next_state)[1:]
         if (len(set(next_state_pos)) == len(next_state_pos) and 0 not in next_state_pos):
-            # print('resetting', next_state_pos)
+            print('resetting', next_state_pos)
             next_state = 0
         
+        # Checking if matrix is converged
+        if(self.check_matrix_converge()):
+            print("Converged, stopping")
+            return
+        
+        # Continue the learning iterations
         self.state = next_state
         print("\n")
         self.sample_action()
         return
-        
+    
+    
+    def check_matrix_converge(self):
+        """Checks if the q-learning matrix is converged by counting how many static changes occur
 
+        Returns:
+            Boolean: True if the q-matrix is believed to have converged, false o.w.
+        """        
+        # If all of the running window changes are to the same value, then we stop learning 
+        test = list(map(lambda x: int(x.split("->")[0]) == int(float(x.split("->")[1])), self.running_update_window))
+        is_converged = np.count_nonzero(test) == self.running_update_window_len
+        print("is_coverged ", is_converged, np.count_nonzero(test), "/", self.running_update_window_len)
+        return is_converged
+        
+        
     def run(self):
         rospy.spin()
         
@@ -233,3 +282,4 @@ def serialize_Q(Q: np.ndarray):
 if __name__ == "__main__":
     node = QLearning()
     node.run()
+
