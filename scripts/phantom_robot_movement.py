@@ -77,7 +77,7 @@ class RobotAction(object):
         self.move_group_arm.stop()
 
 
-    def image_callback(self,msg):
+    def image_callback(self,msg,data):
         # converts the incoming ROS message to cv2 format and HSV (hue, saturation, value)
         image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
