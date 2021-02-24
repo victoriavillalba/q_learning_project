@@ -60,11 +60,21 @@ class RobotAction(object):
 
 
     def pick_up(self):
-        continue
+        arm_joint_goal = [0.0,0.0,0.0,0.0]
+        gripper_joint_goal = [0.0,0.0]
+        self.move_group_arm.go(arm_joint_goal, wait=True)
+        self.move_group_gripper.go(gripper_joint_goal, wait=True)
+        self.move_group_gripper.stop()
+        self.move_group_arm.stop()
 
 
     def put_down(self):
-        continue
+        arm_joint_goal = [0.0,0.0,0.0,0.0]
+        gripper_joint_goal = [0.0,0.0]
+        self.move_group_arm.go(arm_joint_goal, wait=True)
+        self.move_group_gripper.go(gripper_joint_goal, wait=True)
+        self.move_group_gripper.stop()
+        self.move_group_arm.stop()
 
 
     def image_callback(self,msg):
