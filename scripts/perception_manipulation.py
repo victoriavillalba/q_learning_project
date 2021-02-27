@@ -52,8 +52,12 @@ class RobotPerceptionAndManipulation(object):
 
         # Movement publisher
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
+        
+        # Controller node response publishder
+        self.controller_pub = rospy.Publisher('/q_learning/controller', RobotMoveDBToBlock, queue_size=1)
 
         rospy.sleep(3)
+        
         print("ready")
 
         # the interface to the group of joints making up the turtlebot3
@@ -96,6 +100,7 @@ class RobotPerceptionAndManipulation(object):
     def action_loop(self):
         """Dispatches what action we should be taking depending on our intermediate action state 
         """        
+        
         if self.action_state == NOTHING:
             self.cmd_vel_pub.publish(Twist())
         elif self.action_state == MOVE_TO_DB:
@@ -115,6 +120,13 @@ class RobotPerceptionAndManipulation(object):
         
     def drop_db(self):
         print("TODO!")
+        return
+    
+        # When DB has been dropped
+        completed_action = RobotMoveDBToBlock()
+        completed_action.robot_db = self.robot_db
+        completed_action.block_id = self.goal_block_num
+        self.controller_pub.publish(completed_action)
 
     def move_to_db(self):
         image = self.image
