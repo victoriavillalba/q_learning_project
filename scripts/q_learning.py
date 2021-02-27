@@ -4,6 +4,7 @@ import rospy
 from q_learning_project.msg import QMatrix, QMatrixRow, QLearningReward, RobotMoveDBToBlock
 from collections import Counter
 import numpy as np
+from std_msgs.msg import Bool
 
 # Macros for colors 
 RED = 1 
@@ -21,6 +22,7 @@ class QLearning(object):
         # Set publishers for later use 
         self.q_matrix_pub = rospy.Publisher("/q_learning/q_matrix", QMatrix, queue_size=1)
         self.robot_action_pub = rospy.Publisher("/q_learning/robot_action", RobotMoveDBToBlock, queue_size=1)
+        self.is_converged_pub = rospy.Publisher("/q_learning/q_matrix_converged", Bool, queue_size=1)
         
         # Waiting for the publisher to be attached
         rospy.sleep(3)
@@ -46,11 +48,11 @@ class QLearning(object):
         self.time_last_reward = 0
         
         # Time delay between receiving a reward and acting on it. Should have a non-zero value for performance issues
-        self.delay = 0.5
+        self.delay = 0.1
         
         # Used to keep track of the last n q_matrix update values
         # The algorithm will determine if it's converged if the last n values did not produce a new update 
-        self.running_update_window_len = 200 
+        self.running_update_window_len = 100 
         
         # No action was taken yet 
         self.action_choice = -1
@@ -201,6 +203,8 @@ class QLearning(object):
         # Checking if matrix is converged
         if(self.check_matrix_converge()):
             print("Converged, stopping")
+            self.is_converged_pub.publish(Bool(True))
+            self.dump_q_matrix()
             return
         
         # Continue the learning iterations
@@ -222,7 +226,10 @@ class QLearning(object):
         print("is_coverged ", is_converged, np.count_nonzero(test), "/", self.running_update_window_len)
         return is_converged
         
-        
+    def dump_q_matrix(self):
+        q_matrix = self.Q.q_matrix
+        np.savetxt("q_matrix_dump.txt", q_matrix)
+    
     def run(self):
         rospy.spin()
         
