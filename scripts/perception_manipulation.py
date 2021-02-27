@@ -18,8 +18,7 @@ from tf.transformations import quaternion_from_euler, euler_from_quaternion
 class RobotPerceptionAndManipulation(object):
     def __init__(self):
         
-        # initialize node
-        #rospy.init_node('perception_movement')
+        rospy.init_node('perception_movement')
 
         # innitialize the action criteria for the robot
         robot_action = RobotMoveDBToBlock()
@@ -155,8 +154,8 @@ class RobotPerceptionAndManipulation(object):
 
         # use robot arm
         #self.put_down()
-#    def run(self):
- #       rospy.spin()
+    def run(self):
+        rospy.spin()
 
 
 
@@ -164,7 +163,6 @@ class RobotPerceptionAndManipulation(object):
 
 if __name__=="__main__":
 
-    rospy.init_node('perception_movement')
-    robotrm = RobotPerceptionAndManipulation()
-    rospy.spin()
+    node = RobotPerceptionAndManipulation()
+    node.run()
 
