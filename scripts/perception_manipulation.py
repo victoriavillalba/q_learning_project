@@ -15,6 +15,12 @@ from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 #import keras_ocr
 
+# Robot action intermediate states 
+NOTHING = 0
+MOVE_TO_DB = 1 # includes searching 
+PICK_UP_DB = 2
+MOVE_TO_BLOCK = 3 # includes searching
+DROP_DB = 4
 
 class RobotPerceptionAndManipulation(object):
     def __init__(self):
@@ -25,6 +31,9 @@ class RobotPerceptionAndManipulation(object):
         robot_action = RobotMoveDBToBlock()
         self.robot_db = robot_action.robot_db
         self.goal_block_num = robot_action.block_id
+        
+        # initialize state of the robot in performing the action
+        self.action_state = NOTHING
 
         # set up ROS / cv bridge
         self.bridge = cv_bridge.CvBridge()
@@ -38,6 +47,7 @@ class RobotPerceptionAndManipulation(object):
         rospy.Subscriber("/q_learning/robot_action", RobotMoveDBToBlock, self.do_action)
 
         # ROS subscribe to robot's RGB camera data stream
+        self.image = Image()
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw', Image, self.image_callback)
 
         # Movement publisher
@@ -59,6 +69,7 @@ class RobotPerceptionAndManipulation(object):
         # assign dumbbell action to robot
         self.robot_db = robot_action.robot_db
         self.goal_block_num = robot_action.block_id
+        self.action_state = MOVE_TO_DB
         
         print("Assigned task move dumbbell", self.robot_db, "to", self.goal_block_num)
 
@@ -82,10 +93,32 @@ class RobotPerceptionAndManipulation(object):
      #   self.move_group_gripper.stop()
       #  self.move_group_arm.stop()
 
+    def action_loop(self):
+        """Dispatches what action we should be taking depending on our intermediate action state 
+        """        
+        if self.action_state == NOTHING:
+            self.cmd_vel_pub.publish(Twist())
+        elif self.action_state == MOVE_TO_DB:
+            self.move_to_db()
+        elif self.action_state == PICK_UP_DB:
+            self.pick_up_db()
+        elif self.action_state == MOVE_TO_BLOCK:
+            self.move_to_block
+        elif self.action_state == DROP_DB:
+            self.drop_db()
+            
+    def pick_up_db(self):
+        print("TODO!")
+    
+    def move_to_block(self):
+        print("TODO!")
+        
+    def drop_db(self):
+        print("TODO!")
 
-    def image_callback(self, msg):
-        # converts the incoming ROS message to cv2 format and HSV (hue, saturation, value)
-        image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
+    def move_to_db(self):
+        image = self.image
+        
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         # define the upper and lower bounds depending on the color of the dumbbell from self.robot_db
         lower_color = numpy.array([])
@@ -120,6 +153,9 @@ class RobotPerceptionAndManipulation(object):
                 self.twist.linear.x = 0
                 self.twist.angular.z = 0
                 self.cmd_vel_pub.publish(self.twist)
+                
+                # Set new action state
+                self.action_state = PICK_UP_DB
             else:
                 # determine the center of the pixels in the image
                 cx = int(M['m10']/M['m00'])
@@ -135,38 +171,44 @@ class RobotPerceptionAndManipulation(object):
                 self.twist.linear.x = 0.2
                 self.twist.angular.z = k_p * err
                 self.cmd_vel_pub.publish(self.twist)
-        else:
+        else: 
             print("no pixels found, searching..")
             self.twist.angular.z = 0.2
+            self.twist.linear.x = 0.1
             self.cmd_vel_pub.publish(self.twist)
-
-
-        # use robot arm
-        #self.pick_up()
-
-        # find blocks and go towards them
-
-        ### image code for block perception from the project specs
-
-        #pipeline = keras_ocr.pipeline.Pipeline()
-
-        ### Once you have the pipeline, you can use it to recognize characters,
-
-        ### images is a list of images in the cv2 format
-        #images = [img1, img2, ...]
-
-        ### call the recognizer on the list of images
-        #prediction_groups = pipline.recognize(images)
-
-
-        # use robot arm
-        #self.put_down()
+    
+    def image_callback(self, msg):
+        # converts the incoming ROS message to cv2 format and HSV (hue, saturation, value)
+        image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
+        self.image = image
+        
+        
     def run(self):
-        rospy.spin()
+        r = rospy.Rate(10)
+        while not rospy.is_shutdown():
+            self.action_loop()
+            r.sleep()
+
+# use robot arm
+#self.pick_up()
+
+# find blocks and go towards them
+
+### image code for block perception from the project specs
+
+#pipeline = keras_ocr.pipeline.Pipeline()
+
+### Once you have the pipeline, you can use it to recognize characters,
+
+### images is a list of images in the cv2 format
+#images = [img1, img2, ...]
+
+### call the recognizer on the list of images
+#prediction_groups = pipline.recognize(images)
 
 
-
-
+# use robot arm
+#self.put_down()
 
 if __name__=="__main__":
 
