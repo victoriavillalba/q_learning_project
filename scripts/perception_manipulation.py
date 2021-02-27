@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-import rospy, numpy
+import rospy, numpy, cv2, cv_bridge, moveit_commander
+
+from sensor_msgs.msg import Image
 
 from gazebo_msgs.msg import ModelState, ModelStates
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3
@@ -10,15 +12,19 @@ import time
 
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
-import keras_ocr
+#import keras_ocr
 
 
 class RobotPerceptionAndManipulation(object):
     def __init__(self):
+        
+        # initialize node
+        #rospy.init_node('perception_movement')
+
         # innitialize the action criteria for the robot
         robot_action = RobotMoveDBToBlock()
         self.robot_db = robot_action.robot_db
-        self.goal_block_num = robot_action.bock_id
+        self.goal_block_num = robot_action.block_id
 
         # set up ROS / cv bridge
         self.bridge = cv_bridge.CvBridge()
@@ -38,11 +44,11 @@ class RobotPerceptionAndManipulation(object):
 
         # the interface to the group of joints making up the turtlebot3
         # openmanipulator arm
-        self.move_group_arm = moveit_commander.MoveGroupCommander("arm")
+#        self.move_group_arm = moveit_commander.MoveGroupCommander("arm")
 
         # the interface to the group of joints making up the turtlebot3
         # openmanipulator gripper
-        self.move_group_gripper = moveit_commander.MoveGroupCommander("gripper")
+#        self.move_group_gripper = moveit_commander.MoveGroupCommander("gripper")
 
     def do_action(self):
         # get moving info
@@ -55,25 +61,25 @@ class RobotPerceptionAndManipulation(object):
         self.goal_block_num = rbot_action.block_id
 
 
-    def pick_up(self):
-        arm_joint_goal = [0.0,0.0,0.0,0.0]
-        gripper_joint_goal = [0.0,0.0]
-        self.move_group_arm.go(arm_joint_goal, wait=True)
-        self.move_group_gripper.go(gripper_joint_goal, wait=True)
-        self.move_group_gripper.stop()
-        self.move_group_arm.stop()
+#    def pick_up(self):
+ #       arm_joint_goal = [0.0,0.0,0.0,0.0]
+  #      gripper_joint_goal = [0.0,0.0]
+   #     self.move_group_arm.go(arm_joint_goal, wait=True)
+    #    self.move_group_gripper.go(gripper_joint_goal, wait=True)
+     #   self.move_group_gripper.stop()
+      #  self.move_group_arm.stop()
 
 
-    def put_down(self):
-        arm_joint_goal = [0.0,0.0,0.0,0.0]
-        gripper_joint_goal = [0.0,0.0]
-        self.move_group_arm.go(arm_joint_goal, wait=True)
-        self.move_group_gripper.go(gripper_joint_goal, wait=True)
-        self.move_group_gripper.stop()
-        self.move_group_arm.stop()
+#    def put_down(self):
+ #       arm_joint_goal = [0.0,0.0,0.0,0.0]
+  #      gripper_joint_goal = [0.0,0.0]
+   #     self.move_group_arm.go(arm_joint_goal, wait=True)
+    #    self.move_group_gripper.go(gripper_joint_goal, wait=True)
+     #   self.move_group_gripper.stop()
+      #  self.move_group_arm.stop()
 
 
-    def image_callback(self,msg,data):
+    def image_callback(self,msg):
         # converts the incoming ROS message to cv2 format and HSV (hue, saturation, value)
         image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -130,7 +136,7 @@ class RobotPerceptionAndManipulation(object):
 
 
         # use robot arm
-        pick_up()
+        #self.pick_up()
 
         # find blocks and go towards them
 
@@ -148,7 +154,9 @@ class RobotPerceptionAndManipulation(object):
 
 
         # use robot arm
-        put_down()
+        #self.put_down()
+#    def run(self):
+ #       rospy.spin()
 
 
 
@@ -156,6 +164,7 @@ class RobotPerceptionAndManipulation(object):
 
 if __name__=="__main__":
 
-    node = RobotPerceptionAndManipulation()
-    node.run()
+    rospy.init_node('perception_movement')
+    robotrm = RobotPerceptionAndManipulation()
+    rospy.spin()
 
