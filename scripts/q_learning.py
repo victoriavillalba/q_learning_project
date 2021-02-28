@@ -52,7 +52,7 @@ class QLearning(object):
         
         # Used to keep track of the last n q_matrix update values
         # The algorithm will determine if it's converged if the last n values did not produce a new update 
-        self.running_update_window_len = 100 
+        self.running_update_window_len = 200 
         
         # No action was taken yet 
         self.action_choice = -1
