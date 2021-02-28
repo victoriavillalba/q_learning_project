@@ -13,9 +13,10 @@ import time
 
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
-#import keras_ocr
+import keras_ocr
 
 # Robot action intermediate states 
+DISCOVER = -1 # Discovering where the blocks are 
 NOTHING = 0
 MOVE_TO_DB = 1 # includes searching 
 PICK_UP_DB = 2
@@ -26,6 +27,10 @@ class RobotPerceptionAndManipulation(object):
     def __init__(self):
         
         rospy.init_node('perception_movement')
+
+        # Download pretrained keras ocr
+        self.pipeline = keras_ocr.pipeline.Pipeline()
+
 
         # innitialize the action criteria for the robot
         robot_action = RobotMoveDBToBlock()
@@ -40,12 +45,12 @@ class RobotPerceptionAndManipulation(object):
         self.twist = Twist()
 
         # LIDAR data
-        self.data = LaserScan()
+        self.laserdata = LaserScan()
         rospy.Subscriber("scan", LaserScan, self.robot_scan_received)
 
         # ROS subscribe to the topic publishing actions for the robot to take
         rospy.Subscriber("/q_learning/robot_action", RobotMoveDBToBlock, self.do_action)
-
+        
         # ROS subscribe to robot's RGB camera data stream
         self.image = Image()
         self.image_sub = rospy.Subscriber('camera/rgb/image_raw', Image, self.image_callback)
@@ -57,6 +62,7 @@ class RobotPerceptionAndManipulation(object):
         self.controller_pub = rospy.Publisher('/q_learning/controller', RobotMoveDBToBlock, queue_size=1)
 
         rospy.sleep(3)
+        self.cmd_vel_pub.publish(Twist())
         
         print("ready")
 
@@ -78,7 +84,8 @@ class RobotPerceptionAndManipulation(object):
         print("Assigned task move dumbbell", self.robot_db, "to", self.goal_block_num)
 
     def robot_scan_received(self, data: LaserScan):
-        self.data = data
+        self.laserdata = data
+    
 
 #    def pick_up(self):
  #       arm_joint_goal = [0.0,0.0,0.0,0.0]
@@ -100,15 +107,19 @@ class RobotPerceptionAndManipulation(object):
     def action_loop(self):
         """Dispatches what action we should be taking depending on our intermediate action state 
         """        
-        
         if self.action_state == NOTHING:
             self.cmd_vel_pub.publish(Twist())
         elif self.action_state == MOVE_TO_DB:
+            # Debug for now while waiting on pick up db code
+            self.action_state = MOVE_TO_BLOCK
+            print("new action", self.action_state)
+            return 
+            
             self.move_to_db()
         elif self.action_state == PICK_UP_DB:
             self.pick_up_db()
         elif self.action_state == MOVE_TO_BLOCK:
-            self.move_to_block
+            self.move_to_block()
         elif self.action_state == DROP_DB:
             self.drop_db()
             
@@ -116,17 +127,78 @@ class RobotPerceptionAndManipulation(object):
         print("TODO!")
     
     def move_to_block(self):
-        print("TODO!")
+        print("moving to block")
+        block_target = self.goal_block_num
+        interval = len(self.laserdata.ranges) // 10
+        front = min(self.laserdata.ranges[interval * -1:] + self.laserdata.ranges[:interval])
+        print(front)
+        
+        # Check if top image contains a black color number
+        lower_color = numpy.array([0, 0, 0])
+        upper_color = numpy.array([255, 255, 0])
+        mask = cv2.inRange(cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV), lower_color, upper_color)
+        mask[self.image.shape[0]//2:self.image.shape[0], 0:self.image.shape[1]] = 0 # Ignore bottom half i.e. shadows
+        print(mask[0])
+        if (front <= 1 and 255 in mask): # A distance >= 1 is necessary for image recognition (or else we're too close)
+            if (front > 0.5):
+                # Move close to block 
+                twist = Twist()
+                twist.linear.x = 0.1
+                twist.angular.z = 0
+                self.cmd_vel_pub.publish(twist)
+            else: 
+                # Stop moving
+                self.cmd_vel_pub.publish(Twist())
+                self.action_state = DROP_DB
+        else: 
+            # Look for the block
+            self.cmd_vel_pub.publish(Twist()) # Stop the robot before running image recognition
+            prediction_groups = self.pipeline.recognize([self.image])
+            
+            character_found = False
+            
+            for prediction in prediction_groups[0]:
+                recognized_char = prediction[0]
+                print("recognized char", recognized_char)
+                if (recognized_char == str(block_target)):
+                    print("block target", block_target, "found")
+                    character_found = True
+                    index = 0
+                    recognized_char_box = prediction[1] # There can be multiple instances of the recognized char, we just take the first one for now
+                    x = [p[0] for p in recognized_char_box]
+                    y = [p[1] for p in recognized_char_box]
+                    centroid = (sum(x) / len(recognized_char_box), sum(y) / len(recognized_char_box))
+                    
+                    h, w, d = self.image.shape
+                    err = w/2 - centroid[0]
+                    print(w/2, centroid[0], err)
+                    k_p = 1.0 / 1000.0
+                    self.twist.linear.x = 0.5
+                    self.twist.angular.z = k_p * err
+                    self.cmd_vel_pub.publish(self.twist)
+                    rospy.sleep(1) # hold event thread for let it move
+                    return
+            
+            if not character_found: 
+                print("no character found, searching..")
+                self.twist.angular.z = 0.5
+                self.twist.linear.x = 0
+                self.cmd_vel_pub.publish(self.twist)
+                rospy.sleep(1.5) # Sleep for a little before the next event loop to let it search
+                
         
     def drop_db(self):
-        print("TODO!")
-        return
+        rospy.sleep(1)
     
         # When DB has been dropped
+        
+        # TODO: Should move back a little bit
         completed_action = RobotMoveDBToBlock()
         completed_action.robot_db = self.robot_db
         completed_action.block_id = self.goal_block_num
         self.controller_pub.publish(completed_action)
+        
+        return
 
     def move_to_db(self):
         image = self.image
@@ -160,7 +232,7 @@ class RobotPerceptionAndManipulation(object):
         
         if M['m00'] > 0:
             print("pixels found")
-            if self.data.ranges[0] <= 0.4:
+            if self.laserdata.ranges[0] <= 0.4:
                # stop the robot if it's close enough to the dumbbell
                 self.twist.linear.x = 0
                 self.twist.angular.z = 0
