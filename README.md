@@ -31,19 +31,58 @@ __Team Members: Yves Shum and Victoria Villalba__
 
 - Q-learning algorithm description
   - Selecting and executing actions for the robot (or phantom robot) to take
-    - We first initialized an action matrix in `initialize_action_matrix`, that calculates all valid actions to take given a particular state. Valid actions to take basically follow the rule of 1) Not moving dumbbells to origin 2) Not moving dumbbells to a block where a dumbbell already exists 3) No moving dumbbell to the same place.
-    - Selecting actions is done in the function `sample_action`, which checks the current state and indexes into the action matrix, selecting a valid action at random
+    - We first initialized an action matrix in `q_learning.initialize_action_matrix`, that calculates all valid actions to take given a particular state. Valid actions to take basically follow the rule of 1) Not moving dumbbells to origin 2) Not moving dumbbells to a block where a dumbbell already exists 3) No moving dumbbell to the same place.
+    - Selecting actions is done in the function `q_learning.sample_action`, which checks the current state and indexes into the action matrix, selecting a valid action at random
   - Updating the Q-matrix
-    - The Q-matrix is updated whenever a reward is received. This is primarily handled through the `reward_callback` function
-    - Based on the received reward and the action that we took, we update the q matrix via the formula given in class 
-    - ![q_learning_formula](./qlearningformula.GIF)
+    - The Q-matrix is updated whenever a reward is received. This is primarily handled through the `q_learning.reward_callback` function
+    - Based on the received reward and the action that we took, we update the q matrix via the formula given in class, taking into account the maximum reward of the next state
+    - We utilized `alpha=1` and `gamma=0.2` in our learning
+    - We also had to catch a bug where sometimes we would receive a reward when the world resets
   - Determining when to stop iterating through the Q-learning algorithm
+    - Every time we updated a value in our QMatrix, we added the value's change to a running window of length 200, meaning that it contains the last 200 changes made to the QMatrix. This is handled inside `q_learning.reward_callback`
+    - After modifying the running window, we determine that the QMatrix converged if all of the last 200 changes did not produce meaningful change (i.e. changing 100 to 100, 0 to 0, 4 to 4 etc.). This is handled in `q_learning.check_matrix_converge`
+    - Once the QMatrix converge, we stop running the Q-learning algorithm and output the QMatrix to a dump file. 
   - Executing the path most likely to lead to receiving a reward after the Q-matrix has converged on the simulated Turtlebot3 robot
+    - Given a particular state, we were able to choose the best action by indexing into the QMatrix with the current state, and selecting the action that corresponded to the maximum reward. 
+    - If there were multiple maximum rewards, we simply picked the first one
+    - This is handled in `controller_node.selectActionFromState`
 - Robot perception description
+  - Identifying the locations and identities of each of the colored dumbbells
+    - TODO:
+  - Identifying the locations and identities of each of the numbered blocks
+    - Identity of the numbered blocks was identified via passing Image data to `keras-ocr`. We explicitly looked for the characters `1` or `l`, `2`, `3`. This is handled in `perception_manipulation.move_to_block`
+    - No further online sources were used other than the keras documentation linked by the project outline 
+    - Identifying the location of numbered blocks were done given the prediction groups outputted by `kreas-ocr`. We took the center point coordinates of the prediction box to compare with the center of the screen to obtain the direction of the desired numbered block. This is handled also by `perception_manipulation.move_to_block`
 - Robot manipulation and movement 
+  - Moving to the right spot in order to pick up a dumbbell
+    - TODO: 
+  - Picking up the dumbbell
+    - TODO: 
+  - Moving to the desired destination (numbered block) with the dumbbell
+    - Given the prediction groups outputted by `keras-ocr`, we used proportional control on the center of the prediction box compared to the center of the Image to determine the angular velocity of the turtle. 
+    - If no prediction was found, we had to robot run on search mode, rotating slowly on with z angular velocity. 
+    - Our robot stopped every few seconds to allow for `keras-ocr` to slowly parse through the image so that we can instruct our tutlebot accurately on which direction to move towards 
+    - Once we were close enough (~1m) away from the obstacle directly in front, we stopped using information from the Camera since it was too close to recognize numbers anyways. Instead, we used LaserScan information to move as close as possible to the block.
+    - This is handled in `perception_manipulation.move_to_block`
+  - Putting the dumbbell back down at the desired destination
+    - Once the turtle is directly in front of the desire destination, we.. TODO: 
 - Challenges
+  - World reset reward bug 
+    - There was a race condition that led to another reward being published whenever the world reset, on top of the reward for reaching the final state (where a dumbbell is in front of each block). This messed up the control logic for our QLearning algorithm, as it triggered the `q_learning.reward_callback` more than it should have (messing up the algorithm's believed state).
+    - We fixed this by catching for the bogus reward, looking at the timestamp that it was published. The bogus reward always came within 0.01 seconds of the last reward, where we caught and ignored this case in `q_learning.reward_callback`.
+  - OCR performance and manipulation delay 
+    - Running OCR on a camera Image loop continuously led to a lot of problems with instructing the turtle to move accurately. The main issue is that by the time we've finished processing 1 image, the turtle has already moved for a certain amount of time. Whatever instruction we gave to the robot became obsolete and inaccurate.
+    - We overcame this issue by stopping the turtlebot whenever we had to do OCR on the image output. This led to the robot exhibitng clunky movements and it started and stopped moving. 
+  - TODO: dumbbell manipulation
 - Future work
-- Takeaways 
+  - If we had more time, we could have implemented a Odometry-based solution, where we would first scout and map out the pose of the numbered blocks, keeping track of the 3 points in front of each block. This would avoid having to repeatedly run OCR when instructing the turtle to move towards the desired block 
+  - We would also fine-tune the q-learning parameters such as `alpha` and `gamma` to achieve faster matrix convergence 
+  - TODO: 
+- Takeaways
+  - TODO:
+
+## Gif 
+- TODO: once everything is done
 
 ## Implementation Plan (initial)
 
