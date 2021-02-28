@@ -186,7 +186,7 @@ class RobotPerceptionAndManipulation(object):
         self.move_group_arm.stop()
         arm_joint_goal = [0.0,-0.3,1.5,-0.9]
         self.move_group_arm.go(arm_joint_goal, wait=True)
-        sel.move_group_arm.stop()
+        self.move_group_arm.stop()
     
         # When DB has been dropped
         
