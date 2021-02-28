@@ -20,7 +20,7 @@ class Controller(object):
         self.state = 0
 
         self.robot_action_publisher = rospy.Publisher("/q_learning/robot_action", RobotMoveDBToBlock, queue_size=1)
-        
+        self.robot_action = RobotMoveDBToBlock()
         rospy.Subscriber("/q_learning/controller", RobotMoveDBToBlock, self.controller_subscriber_callback)
         
         rospy.sleep(3)
@@ -38,16 +38,21 @@ class Controller(object):
     def controller_subscriber_callback(self, data: RobotMoveDBToBlock):
         # Callback when perception manipulation module claims that it completed what we told it to do
         # Advance current state, and select another action
-        current_state = list(get_state_from_row(self.state))
-        moved_db = convert_str_to_color(data.robot_db)
-        current_state[moved_db] = data.block_id
-        self.state = get_row_from_state(tuple(current_state))
-        print("new state", self.state)
-        self.selectActionFromState()
-        return
+        print("controller subscriber callback", data)
+        if (data == self.robot_action):
+            print("old state\n", get_state_from_row(self.state))
+            current_state = list(get_state_from_row(self.state))
+            moved_db = convert_str_to_color(data.robot_db)
+            current_state[moved_db] = data.block_id
+            self.state = get_row_from_state(tuple(current_state))
+            print("new state\n\n", get_state_from_row(self.state))
+            self.selectActionFromState()
+        else:
+            print("turtlebot robot action mismatch")
         
     def selectActionFromState(self):
         print("Selecting action")
+        
         best_action_reward = max(self.Q.q_matrix[self.state])
         action = np.where(self.Q.q_matrix[self.state] == best_action_reward)[0]
         if len(action) > 1: 
@@ -56,11 +61,11 @@ class Controller(object):
             print("Selecting action", self.state, action)
         dumbbell_color, to_block = get_action_from_col(action[0])
         print("dumbbell color", dumbbell_color, "to", to_block)
-        robot_action = RobotMoveDBToBlock()
-        robot_action.robot_db = convert_color_to_str(dumbbell_color)
-        robot_action.block_id = to_block
-        print("publishing", robot_action)
-        self.robot_action_publisher.publish(robot_action)
+        self.robot_action = RobotMoveDBToBlock()
+        self.robot_action.robot_db = convert_color_to_str(dumbbell_color)
+        self.robot_action.block_id = to_block
+        print("publishing", self.robot_action)
+        self.robot_action_publisher.publish(self.robot_action)
         
         
 def convert_color_to_str(color): 

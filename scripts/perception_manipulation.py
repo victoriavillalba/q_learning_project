@@ -110,11 +110,6 @@ class RobotPerceptionAndManipulation(object):
         if self.action_state == NOTHING:
             self.cmd_vel_pub.publish(Twist())
         elif self.action_state == MOVE_TO_DB:
-            # Debug for now while waiting on pick up db code
-            self.action_state = MOVE_TO_BLOCK
-            print("new action", self.action_state)
-            return 
-            
             self.move_to_db()
         elif self.action_state == PICK_UP_DB:
             self.pick_up_db()
@@ -124,6 +119,7 @@ class RobotPerceptionAndManipulation(object):
             self.drop_db()
             
     def pick_up_db(self):
+        self.action_state = MOVE_TO_BLOCK
         print("TODO!")
     
     def move_to_block(self):
@@ -131,14 +127,12 @@ class RobotPerceptionAndManipulation(object):
         block_target = self.goal_block_num
         interval = len(self.laserdata.ranges) // 10
         front = min(self.laserdata.ranges[interval * -1:] + self.laserdata.ranges[:interval])
-        print(front)
         
         # Check if top image contains a black color number
         lower_color = numpy.array([0, 0, 0])
         upper_color = numpy.array([255, 255, 0])
         mask = cv2.inRange(cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV), lower_color, upper_color)
         mask[self.image.shape[0]//2:self.image.shape[0], 0:self.image.shape[1]] = 0 # Ignore bottom half i.e. shadows
-        print(mask[0])
         if (front <= 1 and 255 in mask): # A distance >= 1 is necessary for image recognition (or else we're too close)
             if (front > 0.5):
                 # Move close to block 
@@ -160,7 +154,7 @@ class RobotPerceptionAndManipulation(object):
             for prediction in prediction_groups[0]:
                 recognized_char = prediction[0]
                 print("recognized char", recognized_char)
-                if (recognized_char == str(block_target)):
+                if (recognized_char == str(block_target) or (block_target == 1 and recognized_char == 'l')):
                     print("block target", block_target, "found")
                     character_found = True
                     index = 0
@@ -193,10 +187,17 @@ class RobotPerceptionAndManipulation(object):
         # When DB has been dropped
         
         # TODO: Should move back a little bit
+        twist = Twist()
+        twist.linear.x = -0.5
+        self.cmd_vel_pub.publish(twist)
+        rospy.sleep(1)
+        self.cmd_vel_pub.publish(Twist())
+        
         completed_action = RobotMoveDBToBlock()
         completed_action.robot_db = self.robot_db
         completed_action.block_id = self.goal_block_num
         self.controller_pub.publish(completed_action)
+        self.action_state = NOTHING
         
         return
 
@@ -209,14 +210,14 @@ class RobotPerceptionAndManipulation(object):
         upper_color = numpy.array([])
 
         if self.robot_db == "red":
-            lower_color = numpy.array([200, 0, 0])
-            upper_color = numpy.array([255, 50, 50])
+            lower_color = numpy.array([0, 128, 128])
+            upper_color = numpy.array([5, 255, 255])
         elif self.robot_db == "green":
-            lower_color = numpy.array([ 37, 75, 100])
-            upper_color = numpy.array([75, 255, 255])
+            lower_color = numpy.array([55, 128, 128])
+            upper_color = numpy.array([65, 255, 255])
         elif self.robot_db == "blue":
-            lower_color = numpy.array([ 0, 0, 200])
-            upper_color = numpy.array([50, 50, 255])
+            lower_color = numpy.array([115, 128, 128])
+            upper_color = numpy.array([125, 255, 255])
         else: 
             # print("no robot_db found, returning for now")
             return
@@ -251,14 +252,15 @@ class RobotPerceptionAndManipulation(object):
 
                 # proportional control to have the robot follow the pixels
                 err = w/2 - cx
-                k_p = 1.0 / 100.0
+                k_p = 1.0 / 1000.0
                 self.twist.linear.x = 0.2
                 self.twist.angular.z = k_p * err
                 self.cmd_vel_pub.publish(self.twist)
         else: 
             print("no pixels found, searching..")
             self.twist.angular.z = 0.2
-            self.twist.linear.x = 0.1
+            self.twist.linear.x = 0
+            # self.twist.linear.x = 0.1
             self.cmd_vel_pub.publish(self.twist)
     
     def image_callback(self, msg):
