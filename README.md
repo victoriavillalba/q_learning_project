@@ -2,6 +2,49 @@
 
 __Team Members: Yves Shum and Victoria Villalba__
 
+## Running 
+
+### Q Learning 
+- Start `roscore`
+- Run Gazebo launch file `roslaunch q_learning_project turtlebot3_intro_robo_manipulation.launch`
+- Run Phantom movement file `rosrun q_learning_project phantom_robot_movement.py` 
+- Run Q learning module `rosrun q_learning_project q_learning.py`
+
+### Actual actions 
+
+- Start `roscore`
+- Run Gazebo launch file `roslaunch q_learning_project turtlebot3_intro_robo_manipulation.launch`
+- Run Moveit config launch `turtlebot3_manipulation_moveit_config move_group.launch`
+- Run perception_manipulation module `rosrun q_learning_project perception_manipulation.py`
+- Run controller node once perception_manipulation outputs ready. `rosrun q_learning_project controller_node.py`
+- Sit back and watch
+
+## Writeup
+
+- Objectives
+  - The goal of the project is to be able to train a Q-Learning model to learn to place certain dumbbell colors near the block that it's associated with. 
+  - The project involved utilizing Image and LaserScan data to understand where the turtle is, and perceiving where the blocks/dumbbells are 
+  - It also involved motor control of picking up dumbbells and dropping them off
+
+- High level description
+  - We utilized the Q-Learning algorithm to build up a Q-Matrix that described the optimal action for each possible state. This algorithm worked by selecting random valid actions depending on a particular robot state, carrinyg out the action, and receiving a reward given by the environment depending on whether the action was correct. We first built 0-initialized QMatrix, then constructed an action matrix detailing what actions are valid for what state. Then we carried out the Q-Learning loop to select a random valid action depending on the current state, carrying out the action with the `phantom_robot_movement` module, then receiving a reward from `reset_world.py`. With this reward we update the `QMatrix` accordingly using the algorithm given in class, with `alpha=1` and `gamma=0.2`. Once the matrix converges, the turtle has successfully learnt which dumbbell goes with which block.
+
+- Q-learning algorithm description
+  - Selecting and executing actions for the robot (or phantom robot) to take
+    - We first initialized an action matrix in `initialize_action_matrix`, that calculates all valid actions to take given a particular state. Valid actions to take basically follow the rule of 1) Not moving dumbbells to origin 2) Not moving dumbbells to a block where a dumbbell already exists 3) No moving dumbbell to the same place.
+    - Selecting actions is done in the function `sample_action`, which checks the current state and indexes into the action matrix, selecting a valid action at random
+  - Updating the Q-matrix
+    - The Q-matrix is updated whenever a reward is received. This is primarily handled through the `reward_callback` function
+    - Based on the received reward and the action that we took, we update the q matrix via the formula given in class 
+    - ![q_learning_formula](qlearningformula.png)
+  - Determining when to stop iterating through the Q-learning algorithm
+  - Executing the path most likely to lead to receiving a reward after the Q-matrix has converged on the simulated Turtlebot3 robot
+- Robot perception description
+- Robot manipulation and movement 
+- Challenges
+- Future work
+- Takeaways 
+
 ## Implementation Plan (initial)
 
 * Executing the Q-learning algorithm
