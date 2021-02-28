@@ -16,7 +16,6 @@ from tf.transformations import quaternion_from_euler, euler_from_quaternion
 import keras_ocr
 
 # Robot action intermediate states 
-DISCOVER = -1 # Discovering where the blocks are 
 NOTHING = 0
 MOVE_TO_DB = 1 # includes searching 
 PICK_UP_DB = 2
@@ -61,11 +60,6 @@ class RobotPerceptionAndManipulation(object):
         # Controller node response publishder
         self.controller_pub = rospy.Publisher('/q_learning/controller', RobotMoveDBToBlock, queue_size=1)
 
-        rospy.sleep(3)
-        self.cmd_vel_pub.publish(Twist())
-        
-        print("ready")
-
         # the interface to the group of joints making up the turtlebot3
         # openmanipulator arm
         self.move_group_arm = moveit_commander.MoveGroupCommander("arm")
@@ -73,6 +67,13 @@ class RobotPerceptionAndManipulation(object):
         # the interface to the group of joints making up the turtlebot3
         # openmanipulator gripper
         self.move_group_gripper = moveit_commander.MoveGroupCommander("gripper")
+
+        rospy.sleep(3)
+        self.cmd_vel_pub.publish(Twist())
+        
+        print("ready")
+
+        
 
     def do_action(self, robot_action: RobotMoveDBToBlock):
         print("Do action")
@@ -85,10 +86,9 @@ class RobotPerceptionAndManipulation(object):
 
         # set up arm to be ready to pick up a dumbbell
         self.move_group_arm.go([0.0,0.7,0.0,-0.5], wait=True)
-        self.move_group_gripper.go([0.1,0.1], wait=True)
         self.move_group_arm.stop()
+        self.move_group_gripper.go([0.01,0.01], wait=True)
         self.move_group_gripper.stop()
-
         print("arm is aligned to pick up")
 
     def robot_scan_received(self, data: LaserScan):
@@ -110,8 +110,9 @@ class RobotPerceptionAndManipulation(object):
             self.drop_db()
             
     def pick_up_db(self):
+        print("Picking up db")
         arm_joint_goal = [0.0,-1.0,0.3,0.7]
-        gripper_joint_goal = [0.04,0.04]
+        gripper_joint_goal = [0.004,0.004]
         self.move_group_arm.go(arm_joint_goal, wait=True)
         self.move_group_gripper.go(gripper_joint_goal, wait=True)
         self.move_group_gripper.stop()
@@ -179,7 +180,7 @@ class RobotPerceptionAndManipulation(object):
         
     def drop_db(self):
         arm_joint_goal = [0.0,0.7,0.0,-0.5]
-        gripper_joint_goal = [0.1,0.1]
+        gripper_joint_goal = [0.01,0.01]
         self.move_group_arm.go(arm_joint_goal, wait=True)
         self.move_group_gripper.go(gripper_joint_goal, wait=True)
         self.move_group_gripper.stop()
@@ -237,7 +238,7 @@ class RobotPerceptionAndManipulation(object):
         
         if M['m00'] > 0:
             print("pixels found")
-            if self.laserdata.ranges[0] <= 0.4:
+            if self.laserdata.ranges[0] <= 0.5:
                # stop the robot if it's close enough to the dumbbell
                 self.twist.linear.x = 0
                 self.twist.angular.z = 0
