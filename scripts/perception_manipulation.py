@@ -68,6 +68,11 @@ class RobotPerceptionAndManipulation(object):
         # openmanipulator gripper
         self.move_group_gripper = moveit_commander.MoveGroupCommander("gripper")
 
+        self.move_group_gripper.go([0.01,0.01], wait=True)
+        self.move_group_arm.go([0.0,0.8,-0.4,-0.4], wait=True)
+        self.move_group_gripper.stop()
+        self.move_group_arm.stop()
+
         rospy.sleep(3)
         self.cmd_vel_pub.publish(Twist())
         
@@ -85,10 +90,10 @@ class RobotPerceptionAndManipulation(object):
         print("Assigned task move dumbbell", self.robot_db, "to", self.goal_block_num)
 
         # set up arm to be ready to pick up a dumbbell
-        self.move_group_arm.go([0.0,0.7,0.0,-0.5], wait=True)
-        self.move_group_arm.stop()
-        self.move_group_gripper.go([0.01,0.01], wait=True)
-        self.move_group_gripper.stop()
+        #self.move_group_arm.go([0.0,1.0,-0.5,-0.5], wait=True)
+        #self.move_group_gripper.go([0.05,0.05], wait=True)
+        #self.move_group_gripper.stop()
+        #self.move_group_arm.stop()
         print("arm is aligned to pick up")
 
     def robot_scan_received(self, data: LaserScan):
@@ -111,11 +116,18 @@ class RobotPerceptionAndManipulation(object):
             
     def pick_up_db(self):
         print("Picking up db")
+        #arm_joint_goal = [0.0,0.8,-0.4,-0.4]
+        #gripper_joint_goal = [0.004,0.004]
+        #self.move_group_arm.go(arm_joint_goal, wait=True)
+        #self.move_group_gripper.go(gripper_joint_goal, wait=True)
+        #self.move_group_gripper.stop()
+        #self.move_group_arm.stop()
+        
+        #self.twist.angular.z = 0.1
+        #self.cmd_vel_pub.publish(self.twist)
+        
         arm_joint_goal = [0.0,-1.0,0.3,0.7]
-        gripper_joint_goal = [0.004,0.004]
         self.move_group_arm.go(arm_joint_goal, wait=True)
-        self.move_group_gripper.go(gripper_joint_goal, wait=True)
-        self.move_group_gripper.stop()
         self.move_group_arm.stop()
         self.action_state = MOVE_TO_BLOCK
     
@@ -238,7 +250,7 @@ class RobotPerceptionAndManipulation(object):
         
         if M['m00'] > 0:
             print("pixels found")
-            if self.laserdata.ranges[0] <= 0.5:
+            if self.laserdata.ranges[0] <= 0.25:
                # stop the robot if it's close enough to the dumbbell
                 self.twist.linear.x = 0
                 self.twist.angular.z = 0
