@@ -10,7 +10,7 @@ from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3
 from q_learning_project.msg import RobotMoveDBToBlock
 
 import time
-
+import moveit_commander
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 import keras_ocr
@@ -68,11 +68,11 @@ class RobotPerceptionAndManipulation(object):
 
         # the interface to the group of joints making up the turtlebot3
         # openmanipulator arm
-#        self.move_group_arm = moveit_commander.MoveGroupCommander("arm")
+        self.move_group_arm = moveit_commander.MoveGroupCommander("arm")
 
         # the interface to the group of joints making up the turtlebot3
         # openmanipulator gripper
-#        self.move_group_gripper = moveit_commander.MoveGroupCommander("gripper")
+        self.move_group_gripper = moveit_commander.MoveGroupCommander("gripper")
 
     def do_action(self, robot_action: RobotMoveDBToBlock):
         print("Do action")
@@ -83,26 +83,17 @@ class RobotPerceptionAndManipulation(object):
         
         print("Assigned task move dumbbell", self.robot_db, "to", self.goal_block_num)
 
+        # set up arm to be ready to pick up a dumbbell
+        self.move_group_arm.go([0.0,0.7,0.0,-0.5], wait=True)
+        self.move_group_gripper.go([0.1,0.1], wait=True)
+        self.move_group_arm.stop()
+        self.move_group_gripper.stop()
+
+        print("arm is aligned to pick up")
+
     def robot_scan_received(self, data: LaserScan):
         self.laserdata = data
     
-
-#    def pick_up(self):
- #       arm_joint_goal = [0.0,0.0,0.0,0.0]
-  #      gripper_joint_goal = [0.0,0.0]
-   #     self.move_group_arm.go(arm_joint_goal, wait=True)
-    #    self.move_group_gripper.go(gripper_joint_goal, wait=True)
-     #   self.move_group_gripper.stop()
-      #  self.move_group_arm.stop()
-
-
-#    def put_down(self):
- #       arm_joint_goal = [0.0,0.0,0.0,0.0]
-  #      gripper_joint_goal = [0.0,0.0]
-   #     self.move_group_arm.go(arm_joint_goal, wait=True)
-    #    self.move_group_gripper.go(gripper_joint_goal, wait=True)
-     #   self.move_group_gripper.stop()
-      #  self.move_group_arm.stop()
 
     def action_loop(self):
         """Dispatches what action we should be taking depending on our intermediate action state 
@@ -119,8 +110,13 @@ class RobotPerceptionAndManipulation(object):
             self.drop_db()
             
     def pick_up_db(self):
+        arm_joint_goal = [0.0,-1.0,0.3,0.7]
+        gripper_joint_goal = [0.04,0.04]
+        self.move_group_arm.go(arm_joint_goal, wait=True)
+        self.move_group_gripper.go(gripper_joint_goal, wait=True)
+        self.move_group_gripper.stop()
+        self.move_group_arm.stop()
         self.action_state = MOVE_TO_BLOCK
-        print("TODO!")
     
     def move_to_block(self):
         print("moving to block")
@@ -182,11 +178,19 @@ class RobotPerceptionAndManipulation(object):
                 
         
     def drop_db(self):
-        rospy.sleep(1)
+        arm_joint_goal = [0.0,0.7,0.0,-0.5]
+        gripper_joint_goal = [0.1,0.1]
+        self.move_group_arm.go(arm_joint_goal, wait=True)
+        self.move_group_gripper.go(gripper_joint_goal, wait=True)
+        self.move_group_gripper.stop()
+        self.move_group_arm.stop()
+        arm_joint_goal = [0.0,-0.3,1.5,-0.9]
+        self.move_group_arm.go(arm_joint_goal, wait=True)
+        sel.move_group_arm.stop()
     
         # When DB has been dropped
         
-        # TODO: Should move back a little bit
+        # Should move back a little bit to avoid bumping into things
         twist = Twist()
         twist.linear.x = -0.5
         self.cmd_vel_pub.publish(twist)
@@ -210,14 +214,14 @@ class RobotPerceptionAndManipulation(object):
         upper_color = numpy.array([])
 
         if self.robot_db == "red":
-            lower_color = numpy.array([0, 128, 128])
-            upper_color = numpy.array([5, 255, 255])
+            lower_color = numpy.array([ 0, 128, 128])
+            upper_color = numpy.array([ 5, 255, 255])
         elif self.robot_db == "green":
-            lower_color = numpy.array([55, 128, 128])
-            upper_color = numpy.array([65, 255, 255])
+            lower_color = numpy.array([ 55, 128, 128])
+            upper_color = numpy.array([ 65, 255, 255])
         elif self.robot_db == "blue":
-            lower_color = numpy.array([115, 128, 128])
-            upper_color = numpy.array([125, 255, 255])
+            lower_color = numpy.array([ 115, 128, 128])
+            upper_color = numpy.array([ 125, 255, 255])
         else: 
             # print("no robot_db found, returning for now")
             return
