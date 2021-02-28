@@ -36,7 +36,7 @@ __Team Members: Yves Shum and Victoria Villalba__
   - Updating the Q-matrix
     - The Q-matrix is updated whenever a reward is received. This is primarily handled through the `reward_callback` function
     - Based on the received reward and the action that we took, we update the q matrix via the formula given in class 
-    - ![q_learning_formula](qlearningformula.png)
+    - ![q_learning_formula](./qlearningformula.GIF)
   - Determining when to stop iterating through the Q-learning algorithm
   - Executing the path most likely to lead to receiving a reward after the Q-matrix has converged on the simulated Turtlebot3 robot
 - Robot perception description
