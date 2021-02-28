@@ -17,12 +17,11 @@ class RobotAction(object):
         self.robot_db = robot_dumbbell
         self.goal_block_num = goal_block_num
 
-
     def __str__(self):
         output_str = ("Robot action: move " + self.robot_db.upper() + 
                       " to block " + str(self.goal_block_num))
         return output_str
-    
+
 
 class PhantomRobotMovement(object):
 
@@ -50,7 +49,8 @@ class PhantomRobotMovement(object):
             3: "number3"
         }
 
-
+        # numbered block locations + dimensions
+        self.current_numbered_block_locations = {}
         self.numbered_block_side_length = 0.8
 
         # db model names
