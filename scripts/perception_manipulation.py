@@ -76,8 +76,8 @@ class RobotPerceptionAndManipulation(object):
         self.move_group_gripper = moveit_commander.MoveGroupCommander(
             "gripper")
 
-        self.move_group_gripper.go([0.01,0.01], wait=True)
-        self.move_group_arm.go([0.0,0.8,-0.4,-0.4], wait=True)
+        self.move_group_gripper.go([0.019,0.019], wait=True)
+        self.move_group_arm.go([0.0,0.95,-0.7,-0.45], wait=True)
         self.move_group_gripper.stop()
         self.move_group_arm.stop()
 
@@ -140,8 +140,11 @@ class RobotPerceptionAndManipulation(object):
         #self.twist.angular.z = 0.1
         #self.cmd_vel_pub.publish(self.twist)
         
-        arm_joint_goal = [0.0,-1.0,0.3,0.7]
+        arm_joint_goal = [0.0,0.0,-0.45,-0.1]
+        gripper_joint_goal = [0.004, 0.004]
+        self.move_group_gripper.go(gripper_joint_goal, wait=True)
         self.move_group_arm.go(arm_joint_goal, wait=True)
+        self.move_group_gripper.stop()
         self.move_group_arm.stop()
         self.action_state = MOVE_TO_BLOCK
 
@@ -216,15 +219,15 @@ class RobotPerceptionAndManipulation(object):
     def drop_db(self):
         """sequence of actions to drop dumbbell at current location
         """
-        arm_joint_goal = [0.0, 0.7, 0.0, -0.5]
-        gripper_joint_goal = [0.01, 0.01]
+        arm_joint_goal = [0.0,0.95,-0.7,-0.45]
+        gripper_joint_goal = [0.019, 0.019]
         self.move_group_arm.go(arm_joint_goal, wait=True)
         self.move_group_gripper.go(gripper_joint_goal, wait=True)
         self.move_group_gripper.stop()
         self.move_group_arm.stop()
-        arm_joint_goal = [0.0, -0.3, 1.5, -0.9]
-        self.move_group_arm.go(arm_joint_goal, wait=True)
-        self.move_group_arm.stop()
+        #arm_joint_goal = [0.0, -0.3, 1.5, -0.9]
+        #self.move_group_arm.go(arm_joint_goal, wait=True)
+        #self.move_group_arm.stop()
 
         # When DB has been dropped
 
