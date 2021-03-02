@@ -166,8 +166,8 @@ class RobotPerceptionAndManipulation(object):
         mask[self.image.shape[0]//2:self.image.shape[0],
              0:self.image.shape[1]] = 0  # Ignore bottom half i.e. shadows
         # A distance >= 1 is necessary for image recognition (or else we're too close)
-        if (front <= 1 and 255 in mask):
-            if (front > 0.5):
+        if (front <= 1.2 and 255 in mask):
+            if (front > 0.4):
                 # Move close to block
                 twist = Twist()
                 twist.linear.x = 0.1
@@ -205,19 +205,21 @@ class RobotPerceptionAndManipulation(object):
                 if (self.laserdata.ranges[:len(self.laserdata.ranges)//2].count(np.inf) > self.laserdata.ranges[len(self.laserdata.ranges)//2:].count(np.inf)):
                     # looking at left block, pick leftmost box in predictions 
                     print("looking at left block")
-                    err = w/2 - min(centroids)[0] # min checks for first item in tuple which is the x coord
-                    k_p = 1.0 / 1000.0
-                    self.twist.linear.x = 0.5
+                    bias = -20
+                    err = w/2 - (min(centroids)[0] + bias) # min checks for first item in tuple which is the x coord
+                    k_p = 1.0 / 800.0
+                    self.twist.linear.x = 0.4
                     self.twist.angular.z = k_p * err
                     self.cmd_vel_pub.publish(self.twist)
                     rospy.sleep(1)  # hold event thread for let it move
                 else:
                     # looking at right block, pick rightmost box in predictions
                     print("looking at right block")
-                    err = w/2 - max(centroids)[0] # max checks for first item in tuple which is the x coord
+                    bias = 20
+                    err = w/2 - (max(centroids)[0] + bias) # max checks for first item in tuple which is the x coord
                     print('max', max(centroids))
                     k_p = 1.0 / 800.0
-                    self.twist.linear.x = 0.5
+                    self.twist.linear.x = 0.4
                     self.twist.angular.z = k_p * err
                     self.cmd_vel_pub.publish(self.twist)
                     rospy.sleep(1)  # hold event thread for let it move
@@ -231,7 +233,7 @@ class RobotPerceptionAndManipulation(object):
                             sum(y) / len(recognized_char_box))
 
                 h, w, d = self.image.shape
-                err = w/2 - centroid[0]
+                err = w/2 - (centroid[0])
                 k_p = 1.0 / 1000.0
                 self.twist.linear.x = 0.5
                 self.twist.angular.z = k_p * err
@@ -337,7 +339,7 @@ class RobotPerceptionAndManipulation(object):
                 # proportional control to have the robot follow the pixels
                 err = w/2 - cx
                 k_p = 1.0 / 1000.0
-                self.twist.linear.x = 0.2
+                self.twist.linear.x = 0.1
                 self.twist.angular.z = k_p * err
                 self.cmd_vel_pub.publish(self.twist)
         else:
