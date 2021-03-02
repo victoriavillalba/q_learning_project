@@ -50,6 +50,8 @@ class Controller(object):
             moved_db = convert_str_to_color(data.robot_db)
             current_state[moved_db] = data.block_id
             self.state = get_row_from_state(tuple(current_state))
+            if (self.state == 39): # map auto reset
+                self.state = 0 
             self.selectActionFromState()
         else:
             return

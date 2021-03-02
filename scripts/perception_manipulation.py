@@ -18,6 +18,7 @@ import moveit_commander
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 import keras_ocr
+import numpy as np 
 
 # Robot action intermediate states
 NOTHING = 0
@@ -182,39 +183,75 @@ class RobotPerceptionAndManipulation(object):
             self.cmd_vel_pub.publish(Twist())
             prediction_groups = self.pipeline.recognize([self.image])
 
-            character_found = False
+            print(prediction_groups)
 
-            for prediction in prediction_groups[0]:
-                recognized_char = prediction[0]
-                print("recognized char", recognized_char)
-                if (recognized_char == str(block_target) or (block_target == 1 and recognized_char == 'l')):
-                    print("block target", block_target, "found")
-                    character_found = True
-                    index = 0
-                    # There can be multiple instances of the recognized char, we just take the first one for now
-                    recognized_char_box = prediction[1]
-                    x = [p[0] for p in recognized_char_box]
-                    y = [p[1] for p in recognized_char_box]
-                    centroid = (sum(x) / len(recognized_char_box),
-                                sum(y) / len(recognized_char_box))
+            block_target_chars = [str(block_target)]
+            if (block_target == 1):
+                block_target_chars.append('l')
+            elif (block_target == 3):
+                # likely confused targets
+                block_target_chars.append('5')
+                block_target_chars.append('b')
+                block_target_chars.append('s')
+                block_target_chars.append('31')
 
-                    h, w, d = self.image.shape
-                    err = w/2 - centroid[0]
-                    print(w/2, centroid[0], err)
+            matches_predictions = [prediction_groups[0][i] for i in range(len(prediction_groups[0])) if prediction_groups[0][i][0] in block_target_chars]
+            if (len(matches_predictions) > 1):
+                # 2 matches, check lidar data to pick 
+                print("2 matches found")
+                # Determine if looking at right or left block given that we're looking from near the centre
+                centroids = [(sum([p[0] for p in box[1]]) / len(box[1]), sum(p[1] for p in box[1]) / len(box[1])) for box in matches_predictions]
+                h, w, d = self.image.shape 
+                if (self.laserdata.ranges[:len(self.laserdata.ranges)//2].count(np.inf) > self.laserdata.ranges[len(self.laserdata.ranges)//2:].count(np.inf)):
+                    # looking at left block, pick leftmost box in predictions 
+                    print("looking at left block")
+                    err = w/2 - min(centroids)[0] # min checks for first item in tuple which is the x coord
                     k_p = 1.0 / 1000.0
                     self.twist.linear.x = 0.5
                     self.twist.angular.z = k_p * err
                     self.cmd_vel_pub.publish(self.twist)
                     rospy.sleep(1)  # hold event thread for let it move
-                    return
+                else:
+                    # looking at right block, pick rightmost box in predictions
+                    print("looking at right block")
+                    err = w/2 - max(centroids)[0] # max checks for first item in tuple which is the x coord
+                    print('max', max(centroids))
+                    k_p = 1.0 / 800.0
+                    self.twist.linear.x = 0.5
+                    self.twist.angular.z = k_p * err
+                    self.cmd_vel_pub.publish(self.twist)
+                    rospy.sleep(1)  # hold event thread for let it move
+            elif (len(matches_predictions) == 1):
+                # 1 exact match 
+                print("1 block target", block_target, "found")
+                recognized_char_box = matches_predictions[0][1]
+                x = [p[0] for p in recognized_char_box]
+                y = [p[1] for p in recognized_char_box]
+                centroid = (sum(x) / len(recognized_char_box),
+                            sum(y) / len(recognized_char_box))
 
-            if not character_found:
+                h, w, d = self.image.shape
+                err = w/2 - centroid[0]
+                k_p = 1.0 / 1000.0
+                self.twist.linear.x = 0.5
+                self.twist.angular.z = k_p * err
+                self.cmd_vel_pub.publish(self.twist)
+                rospy.sleep(1)  # hold event thread for let it move
+            else: 
+                # no match
                 print("no character found, searching..")
+                self.twist.angular.z = 0 
+                self.twist.linear.x = -0.05
+                self.cmd_vel_pub.publish(self.twist)
+                rospy.sleep(1)
                 self.twist.angular.z = 0.5
                 self.twist.linear.x = 0
                 self.cmd_vel_pub.publish(self.twist)
                 # Sleep for a little before the next event loop to let it search
                 rospy.sleep(1.5)
+
+
+                
 
     def drop_db(self):
         """sequence of actions to drop dumbbell at current location
