@@ -48,16 +48,16 @@ __Team Members: Yves Shum and Victoria Villalba__
     - This is handled in `controller_node.selectActionFromState`
 - Robot perception description
   - Identifying the locations and identities of each of the colored dumbbells
-    - TODO:
+    - We looked to the third class meeting for the line follower documentation in order to imitate most of the code. Then, we added a conditional that applied upper and lower bounds for hte HSV values depending on which dumbbell the robot should be looking for, changed the mask so that it only looks at that range rather than making it look for a line across the screen of that color, and removed the red dot that's supposed to be in the center of the screen for the line follower implementation.
   - Identifying the locations and identities of each of the numbered blocks
     - Identity of the numbered blocks was identified via passing Image data to `keras-ocr`. We explicitly looked for the characters `1` or `l`, `2`, `3`. This is handled in `perception_manipulation.move_to_block`
     - No further online sources were used other than the keras documentation linked by the project outline 
     - Identifying the location of numbered blocks were done given the prediction groups outputted by `kreas-ocr`. We took the center point coordinates of the prediction box to compare with the center of the screen to obtain the direction of the desired numbered block. This is handled also by `perception_manipulation.move_to_block`
 - Robot manipulation and movement 
   - Moving to the right spot in order to pick up a dumbbell
-    - TODO: 
+    - This worked concurrently with picking up the dembbell because it had to stop at a certain distance from the dumbbell so that the gripper is perfectly around the dumbbell. At first, it was stopped at a short distance that didn't interfere with the dumbbell, then we adjusted the distance based on the arm manipulation.
   - Picking up the dumbbell
-    - TODO: 
+    - This involved some calculations on paper based on an estimate of the distance between the robot and the dumbbell, then a long time of adjusting the angles by minor degrees in order to make sure the gripper is right around the column, at the perfect height, and the perfect distance from the robot so that it doesn't start toppling over. Another meaasure was to make sure that picking it up would not obstruct the view of the camera, so it was raised high enough to be able to hold it while not getting in the way.
   - Moving to the desired destination (numbered block) with the dumbbell
     - Given the prediction groups outputted by `keras-ocr`, we used proportional control on the center of the prediction box compared to the center of the Image to determine the angular velocity of the turtle. 
     - If no prediction was found, we had to robot run on search mode, rotating slowly on with z angular velocity. 
@@ -65,7 +65,7 @@ __Team Members: Yves Shum and Victoria Villalba__
     - Once we were close enough (~1m) away from the obstacle directly in front, we stopped using information from the Camera since it was too close to recognize numbers anyways. Instead, we used LaserScan information to move as close as possible to the block.
     - This is handled in `perception_manipulation.move_to_block`
   - Putting the dumbbell back down at the desired destination
-    - Once the turtle is directly in front of the desire destination, we.. TODO: 
+    - Once the turtle is directly in front of the desire destination, we calibrated the joints to go back into the picking up position to be ready to pick up the next one, along with opening the gripper to let go of its current dumbbell and back out without knocking it down.
 - Challenges
   - World reset reward bug 
     - There was a race condition that led to another reward being published whenever the world reset, on top of the reward for reaching the final state (where a dumbbell is in front of each block). This messed up the control logic for our QLearning algorithm, as it triggered the `q_learning.reward_callback` more than it should have (messing up the algorithm's believed state).
@@ -73,16 +73,19 @@ __Team Members: Yves Shum and Victoria Villalba__
   - OCR performance and manipulation delay 
     - Running OCR on a camera Image loop continuously led to a lot of problems with instructing the turtle to move accurately. The main issue is that by the time we've finished processing 1 image, the turtle has already moved for a certain amount of time. Whatever instruction we gave to the robot became obsolete and inaccurate.
     - We overcame this issue by stopping the turtlebot whenever we had to do OCR on the image output. This led to the robot exhibitng clunky movements and it started and stopped moving. 
-  - TODO: dumbbell manipulation
+  - Dumbbell manipulation took so many hours, relaunching all the windows and running the nodes every time the joint angle had to change by 0.05 radians. We had to watch out for the arm knocking over the dumbbell before being able to grab it, the robot running into the dumbbell, thegripper not opening wide enough to grab it, and making sure the dumbbell didn't hit other dumbbells once it was picked up, or block the view.
 - Future work
   - If we had more time, we could have implemented a Odometry-based solution, where we would first scout and map out the pose of the numbered blocks, keeping track of the 3 points in front of each block. This would avoid having to repeatedly run OCR when instructing the turtle to move towards the desired block 
   - We would also fine-tune the q-learning parameters such as `alpha` and `gamma` to achieve faster matrix convergence 
-  - TODO: 
+  - We would make the arm manipulation more precise and careful when picking things up, and also assure that the robot approaches the dumbbell from one of its sides, and never from the corner of the dumbbell since that just makes it slightly easier and allows more certainty that they will all be picked up by specific angle measurements.
 - Takeaways
-  - TODO:
+  - Helpinig each other out
+    - If you are having problems with errors you don't understand or you're stuck on something, it's always good to reach out because your partner might now exactly how to handle it and the project will move along much faster. it's also useful for brainstorming during the harder parts of the code, like figuring out how to make sure that the robot drops the dumbbell directly in front of the number on the block. 
+  - Check up on each other
+    - There are times when your partner will be busy, so it's good to know where each of you are at in your work. When working together on one project, it's pretty important to see how much progress was made and how you will split the work and assign what to who. 
 
 ## Gif 
-- TODO: once everything is done
+- ![Simulation](q_learning_gif.gif)
 
 ## Implementation Plan (initial)
 
