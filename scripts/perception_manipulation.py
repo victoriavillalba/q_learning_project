@@ -18,7 +18,7 @@ import moveit_commander
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 import keras_ocr
-import numpy as np 
+import numpy as np
 
 # Robot action intermediate states
 NOTHING = 0
@@ -77,8 +77,9 @@ class RobotPerceptionAndManipulation(object):
         self.move_group_gripper = moveit_commander.MoveGroupCommander(
             "gripper")
 
-        self.move_group_gripper.go([0.019,0.019], wait=True)
-        self.move_group_arm.go([0.0,0.95,-0.7,-0.45], wait=True)
+        # Move to initial position
+        self.move_group_gripper.go([0.019, 0.019], wait=True)
+        self.move_group_arm.go([0.0, 0.95, -0.7, -0.45], wait=True)
         self.move_group_gripper.stop()
         self.move_group_arm.stop()
 
@@ -97,13 +98,6 @@ class RobotPerceptionAndManipulation(object):
         self.robot_db = robot_action.robot_db
         self.goal_block_num = robot_action.block_id
         self.action_state = MOVE_TO_DB
-
-        # set up arm to be ready to pick up a dumbbell
-        #self.move_group_arm.go([0.0,1.0,-0.5,-0.5], wait=True)
-        #self.move_group_gripper.go([0.05,0.05], wait=True)
-        #self.move_group_gripper.stop()
-        #self.move_group_arm.stop()
-        print("arm is aligned to pick up")
 
     def robot_scan_received(self, data: LaserScan):
         """Callback for laser scan data 
@@ -130,18 +124,7 @@ class RobotPerceptionAndManipulation(object):
     def pick_up_db(self):
         """Sequence of action to pick up a dumbbell
         """
-        print("Picking up db")
-        #arm_joint_goal = [0.0,0.8,-0.4,-0.4]
-        #gripper_joint_goal = [0.004,0.004]
-        #self.move_group_arm.go(arm_joint_goal, wait=True)
-        #self.move_group_gripper.go(gripper_joint_goal, wait=True)
-        #self.move_group_gripper.stop()
-        #self.move_group_arm.stop()
-        
-        #self.twist.angular.z = 0.1
-        #self.cmd_vel_pub.publish(self.twist)
-        
-        arm_joint_goal = [0.0,0.0,-0.45,-0.1]
+        arm_joint_goal = [0.0, 0.0, -0.45, -0.1]
         gripper_joint_goal = [0.004, 0.004]
         self.move_group_gripper.go(gripper_joint_goal, wait=True)
         self.move_group_arm.go(arm_joint_goal, wait=True)
@@ -152,21 +135,21 @@ class RobotPerceptionAndManipulation(object):
     def move_to_block(self):
         """Sequence of actions to identify and move to a block
         """
-        print("moving to block")
         block_target = self.goal_block_num
         interval = len(self.laserdata.ranges) // 10
         front = min(
             self.laserdata.ranges[interval * -1:] + self.laserdata.ranges[:interval])
 
-        # Check if top image contains a black color number
+        # Check if top half of image contains a black color number
         lower_color = numpy.array([0, 0, 0])
         upper_color = numpy.array([255, 255, 0])
         mask = cv2.inRange(cv2.cvtColor(
             self.image, cv2.COLOR_BGR2HSV), lower_color, upper_color)
         mask[self.image.shape[0]//2:self.image.shape[0],
              0:self.image.shape[1]] = 0  # Ignore bottom half i.e. shadows
+
         # A distance >= 1 is necessary for image recognition (or else we're too close)
-        if (front <= 1.2 and 255 in mask):
+        if (front <= 1.2 and 255 in mask): # In front of a block
             if (front > 0.4):
                 # Move close to block
                 twist = Twist()
@@ -183,8 +166,6 @@ class RobotPerceptionAndManipulation(object):
             self.cmd_vel_pub.publish(Twist())
             prediction_groups = self.pipeline.recognize([self.image])
 
-            print(prediction_groups)
-
             block_target_chars = [str(block_target)]
             if (block_target == 1):
                 block_target_chars.append('l')
@@ -195,18 +176,19 @@ class RobotPerceptionAndManipulation(object):
                 block_target_chars.append('s')
                 block_target_chars.append('31')
 
-            matches_predictions = [prediction_groups[0][i] for i in range(len(prediction_groups[0])) if prediction_groups[0][i][0] in block_target_chars]
+            matches_predictions = [prediction_groups[0][i] for i in range(
+                len(prediction_groups[0])) if prediction_groups[0][i][0] in block_target_chars]
             if (len(matches_predictions) > 1):
-                # 2 matches, check lidar data to pick 
-                print("2 matches found")
+                # 2 matches, check lidar data to pick
                 # Determine if looking at right or left block given that we're looking from near the centre
-                centroids = [(sum([p[0] for p in box[1]]) / len(box[1]), sum(p[1] for p in box[1]) / len(box[1])) for box in matches_predictions]
-                h, w, d = self.image.shape 
+                centroids = [(sum([p[0] for p in box[1]]) / len(box[1]), sum(p[1]
+                                                                             for p in box[1]) / len(box[1])) for box in matches_predictions]
+                h, w, d = self.image.shape
                 if (self.laserdata.ranges[:len(self.laserdata.ranges)//2].count(np.inf) > self.laserdata.ranges[len(self.laserdata.ranges)//2:].count(np.inf)):
-                    # looking at left block, pick leftmost box in predictions 
-                    print("looking at left block")
+                    # looking at left block, pick leftmost box in predictions
                     bias = -20
-                    err = w/2 - (min(centroids)[0] + bias) # min checks for first item in tuple which is the x coord
+                    # min checks for first item in tuple which is the x coord
+                    err = w/2 - (min(centroids)[0] + bias)
                     k_p = 1.0 / 800.0
                     self.twist.linear.x = 0.4
                     self.twist.angular.z = k_p * err
@@ -214,18 +196,16 @@ class RobotPerceptionAndManipulation(object):
                     rospy.sleep(1)  # hold event thread for let it move
                 else:
                     # looking at right block, pick rightmost box in predictions
-                    print("looking at right block")
                     bias = 20
-                    err = w/2 - (max(centroids)[0] + bias) # max checks for first item in tuple which is the x coord
-                    print('max', max(centroids))
+                    # max checks for first item in tuple which is the x coord
+                    err = w/2 - (max(centroids)[0] + bias)
                     k_p = 1.0 / 800.0
                     self.twist.linear.x = 0.4
                     self.twist.angular.z = k_p * err
                     self.cmd_vel_pub.publish(self.twist)
                     rospy.sleep(1)  # hold event thread for let it move
             elif (len(matches_predictions) == 1):
-                # 1 exact match 
-                print("1 block target", block_target, "found")
+                # 1 exact match
                 recognized_char_box = matches_predictions[0][1]
                 x = [p[0] for p in recognized_char_box]
                 y = [p[1] for p in recognized_char_box]
@@ -239,10 +219,9 @@ class RobotPerceptionAndManipulation(object):
                 self.twist.angular.z = k_p * err
                 self.cmd_vel_pub.publish(self.twist)
                 rospy.sleep(1)  # hold event thread for let it move
-            else: 
+            else:
                 # no match
-                print("no character found, searching..")
-                self.twist.angular.z = 0 
+                self.twist.angular.z = 0
                 self.twist.linear.x = -0.05
                 self.cmd_vel_pub.publish(self.twist)
                 rospy.sleep(1)
@@ -252,13 +231,10 @@ class RobotPerceptionAndManipulation(object):
                 # Sleep for a little before the next event loop to let it search
                 rospy.sleep(1.5)
 
-
-                
-
     def drop_db(self):
         """sequence of actions to drop dumbbell at current location
         """
-        arm_joint_goal = [0.0,0.95,-0.7,-0.45]
+        arm_joint_goal = [0.0, 0.95, -0.7, -0.45]
         gripper_joint_goal = [0.019, 0.019]
         self.move_group_arm.go(arm_joint_goal, wait=True)
         self.move_group_gripper.go(gripper_joint_goal, wait=True)
@@ -266,7 +242,7 @@ class RobotPerceptionAndManipulation(object):
         self.move_group_arm.stop()
         #arm_joint_goal = [0.0, -0.3, 1.5, -0.9]
         #self.move_group_arm.go(arm_joint_goal, wait=True)
-        #self.move_group_arm.stop()
+        # self.move_group_arm.stop()
 
         # When DB has been dropped
 
@@ -305,7 +281,6 @@ class RobotPerceptionAndManipulation(object):
             lower_color = numpy.array([115, 128, 128])
             upper_color = numpy.array([125, 255, 255])
         else:
-            # print("no robot_db found, returning for now")
             return
 
         # Masking only valid colors
@@ -318,7 +293,6 @@ class RobotPerceptionAndManipulation(object):
         M = cv2.moments(mask)
 
         if M['m00'] > 0:
-            print("pixels found")
             if self.laserdata.ranges[0] <= 0.25:
                # stop the robot if it's close enough to the dumbbell
                 self.twist.linear.x = 0
@@ -343,7 +317,6 @@ class RobotPerceptionAndManipulation(object):
                 self.twist.angular.z = k_p * err
                 self.cmd_vel_pub.publish(self.twist)
         else:
-            print("no pixels found, searching..")
             self.twist.angular.z = 0.2
             self.twist.linear.x = 0
             # self.twist.linear.x = 0.1
